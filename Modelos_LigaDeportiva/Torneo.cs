@@ -11,6 +11,7 @@ namespace Modelos_LigaDeportiva
         public int Id { get; set; }
         public string Nombre { get; set; }
         public string TipoTorneo { get; set; }
+        public string EstadoTorneo { get; set; }
         public DateTime FechaInicio { get; set; }
         public DateTime FechaFin { get; set; }
 
