@@ -23,33 +23,54 @@ namespace Api_LigaDeportiva.Controllers
 
         // GET: api/Inscripciones
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Inscripcion>>> GetInscripcion()
+        public async Task<ActionResult<ApiResult<List<Inscripcion>>>> GetInscripcion()
         {
-            return await _context.Inscripcion.ToListAsync();
+            try
+            {
+                var data = await _context.Inscripcion
+                    .Include(i => i.Torneo)
+                    .Include(i => i.Equipo)
+                    .ToListAsync();
+
+                return ApiResult<List<Inscripcion>>.Ok(data);
+            }
+            catch (Exception ex)
+            {
+                return ApiResult<List<Inscripcion>>.Fail(ex.Message);
+            }
         }
 
         // GET: api/Inscripciones/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<Inscripcion>> GetInscripcion(int id)
+        public async Task<ActionResult<ApiResult<Inscripcion>>> GetInscripcion(int id)
         {
-            var inscripcion = await _context.Inscripcion.FindAsync(id);
-
-            if (inscripcion == null)
+            try
             {
-                return NotFound();
-            }
+                var inscripcion = await _context.Inscripcion
+                    .Include(i => i.Torneo)
+                    .Include(i => i.Equipo)
+                    .FirstOrDefaultAsync(i => i.Id == id);
 
-            return inscripcion;
+                if (inscripcion == null)
+                {
+                    return ApiResult<Inscripcion>.Fail("Inscripción no encontrada.");
+                }
+
+                return ApiResult<Inscripcion>.Ok(inscripcion);
+            }
+            catch (Exception ex)
+            {
+                return ApiResult<Inscripcion>.Fail(ex.Message);
+            }
         }
 
         // PUT: api/Inscripciones/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutInscripcion(int id, Inscripcion inscripcion)
+        public async Task<ActionResult<ApiResult<Inscripcion>>> PutInscripcion(int id, Inscripcion inscripcion)
         {
             if (id != inscripcion.Id)
             {
-                return BadRequest();
+                return ApiResult<Inscripcion>.Fail("No coinciden los identificadores.");
             }
 
             _context.Entry(inscripcion).State = EntityState.Modified;
@@ -58,46 +79,98 @@ namespace Api_LigaDeportiva.Controllers
             {
                 await _context.SaveChangesAsync();
             }
-            catch (DbUpdateConcurrencyException)
+            catch (DbUpdateConcurrencyException ex)
             {
                 if (!InscripcionExists(id))
                 {
-                    return NotFound();
+                    return ApiResult<Inscripcion>.Fail("Datos no encontrados.");
                 }
                 else
                 {
-                    throw;
+                    return ApiResult<Inscripcion>.Fail(ex.Message);
                 }
             }
 
-            return NoContent();
+            return ApiResult<Inscripcion>.Ok(inscripcion);
         }
 
         // POST: api/Inscripciones
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
-        public async Task<ActionResult<Inscripcion>> PostInscripcion(Inscripcion inscripcion)
+        public async Task<ActionResult<ApiResult<Inscripcion>>> PostInscripcion(Inscripcion inscripcion)
         {
-            _context.Inscripcion.Add(inscripcion);
-            await _context.SaveChangesAsync();
+            try
+            {
+                var torneo = await _context.Torneo.FindAsync(inscripcion.TorneoId);
+                var equipo = await _context.Equipo.FindAsync(inscripcion.EquipoId);
 
-            return CreatedAtAction("GetInscripcion", new { id = inscripcion.Id }, inscripcion);
+                if (torneo == null || equipo == null)
+                {
+                    return ApiResult<Inscripcion>.Fail("Torneo o Equipo especificado no existe.");
+                }
+
+                if (torneo.EstadoTorneo != null && torneo.EstadoTorneo != "Inscripcion") 
+                {
+                    return ApiResult<Inscripcion>.Fail($"El torneo '{torneo.Nombre}' ya ha iniciado y no acepta más inscripciones");
+                }
+
+                var totalInscritos = await _context.Inscripcion
+                    .CountAsync(i => i.TorneoId == inscripcion.TorneoId);
+
+                if (totalInscritos >= 32)
+                {
+                   return ApiResult<Inscripcion>.Fail("El torneo ya alcanzó el límite máximo de 32 equipos");
+                }
+
+                // 4. Validación de Unicidad: Un equipo no se puede inscribir dos veces
+                var yaInscrito = await _context.Inscripcion
+                    .AnyAsync(i => i.TorneoId == inscripcion.TorneoId && i.EquipoId == inscripcion.EquipoId);
+
+                if (yaInscrito)
+                {
+                    return ApiResult<Inscripcion>.Fail("Este equipo ya se encuentra inscrito en el torneo.");
+                }
+
+                // Si todas las validaciones pasan, se añade la inscripción
+                _context.Inscripcion.Add(inscripcion);
+                await _context.SaveChangesAsync();
+
+                return ApiResult<Inscripcion>.Ok(inscripcion);
+            }
+            catch (Exception ex)
+            {
+                return ApiResult<Inscripcion>.Fail(ex.Message);
+            }
         }
 
         // DELETE: api/Inscripciones/5
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteInscripcion(int id)
+        public async Task<ActionResult<ApiResult<Inscripcion>>> DeleteInscripcion(int id)
         {
-            var inscripcion = await _context.Inscripcion.FindAsync(id);
-            if (inscripcion == null)
+            try
             {
-                return NotFound();
+                var inscripcion = await _context.Inscripcion
+                    .Include(i => i.Torneo)
+                    .FirstOrDefaultAsync(i => i.Id == id);
+
+                if (inscripcion == null)
+                {
+                    return ApiResult<Inscripcion>.Fail("Inscripción no encontrada.");
+                }
+
+                if (inscripcion.Torneo != null && inscripcion.Torneo.EstadoTorneo != null && inscripcion.Torneo.EstadoTorneo != "Inscripcion")
+                {
+                     return ApiResult<Inscripcion>.Fail($"No se puede eliminar la inscripción. El torneo '{inscripcion.Torneo.Nombre}' ya ha iniciado");
+                }
+
+                _context.Inscripcion.Remove(inscripcion);
+                await _context.SaveChangesAsync();
+
+                return ApiResult<Inscripcion>.Ok(null);
             }
-
-            _context.Inscripcion.Remove(inscripcion);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
+            catch (Exception ex)
+            {
+                return ApiResult<Inscripcion>.Fail(ex.Message);
+            }
         }
 
         private bool InscripcionExists(int id)
