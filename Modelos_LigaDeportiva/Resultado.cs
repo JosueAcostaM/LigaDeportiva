@@ -14,7 +14,7 @@ namespace Modelos_LigaDeportiva
         public int GolesLocal { get; set; }
         public int GolesVisitante { get; set; }
 
-        public int? IdEquipoGanador { get; set; }
+        public string? EquipoGanador { get; set; }
 
         public int PartidoId { get; set; }
         public Partido? Partido { get; set; }

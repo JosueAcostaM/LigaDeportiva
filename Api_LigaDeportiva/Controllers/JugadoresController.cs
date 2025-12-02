@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Api_LigaDeportiva.Data;
@@ -23,33 +22,56 @@ namespace Api_LigaDeportiva.Controllers
 
         // GET: api/Jugadores
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Jugador>>> GetJugador()
+        public async Task<ActionResult<ApiResult<List<Jugador>>>> GetJugador()
         {
-            return await _context.Jugador.ToListAsync();
+            try
+            {
+                var data = await _context.Jugador
+                    .Include(j => j.Equipo)
+                    .ToListAsync();
+                return ApiResult<List<Jugador>>.Ok(data);
+            }
+            catch (Exception ex)
+            {
+                return ApiResult<List<Jugador>>.Fail(ex.Message);
+            }
         }
 
         // GET: api/Jugadores/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<Jugador>> GetJugador(int id)
+        public async Task<ActionResult<ApiResult<Jugador>>> GetJugador(int id)
         {
-            var jugador = await _context.Jugador.FindAsync(id);
-
-            if (jugador == null)
+            try
             {
-                return NotFound();
-            }
+                var jugador = await _context.Jugador
+                    .Include(j => j.Equipo)
+                    .FirstOrDefaultAsync(j => j.Id == id);
 
-            return jugador;
+                if (jugador == null)
+                {
+                    return ApiResult<Jugador>.Fail("Jugador no encontrado.");
+                }
+
+                return ApiResult<Jugador>.Ok(jugador);
+            }
+            catch (Exception ex)
+            {
+                return ApiResult<Jugador>.Fail(ex.Message);
+            }
         }
 
         // PUT: api/Jugadores/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutJugador(int id, Jugador jugador)
+        public async Task<ActionResult<ApiResult<Jugador>>> PutJugador(int id, Jugador jugador)
         {
             if (id != jugador.Id)
             {
-                return BadRequest();
+                return ApiResult<Jugador>.Fail("No coinciden los identificadores.");
+            }
+
+            if (!await _context.Equipo.AnyAsync(e => e.Id == jugador.EquipoId))
+            {
+                return ApiResult<Jugador>.Fail($"El Equipo{jugador.EquipoId} no existe.");
             }
 
             _context.Entry(jugador).State = EntityState.Modified;
@@ -58,46 +80,74 @@ namespace Api_LigaDeportiva.Controllers
             {
                 await _context.SaveChangesAsync();
             }
-            catch (DbUpdateConcurrencyException)
+            catch (DbUpdateConcurrencyException ex)
             {
                 if (!JugadorExists(id))
                 {
-                    return NotFound();
+                    return ApiResult<Jugador>.Fail("Datos no encontrados.");
                 }
                 else
                 {
-                    throw;
+                    return ApiResult<Jugador>.Fail(ex.Message);
                 }
             }
 
-            return NoContent();
+            return ApiResult<Jugador>.Ok(jugador);
         }
 
         // POST: api/Jugadores
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
-        public async Task<ActionResult<Jugador>> PostJugador(Jugador jugador)
+        public async Task<ActionResult<ApiResult<Jugador>>> PostJugador(Jugador jugador)
         {
-            _context.Jugador.Add(jugador);
-            await _context.SaveChangesAsync();
+            try
+            {
+                if (!await _context.Equipo.AnyAsync(e => e.Id == jugador.EquipoId))
+                {
+                    return ApiResult<Jugador>.Fail($"El Equipo {jugador.EquipoId} no existe, no se puede asignar jugador");
+                }
 
-            return CreatedAtAction("GetJugador", new { id = jugador.Id }, jugador);
+                _context.Jugador.Add(jugador);
+                await _context.SaveChangesAsync();
+
+                return ApiResult<Jugador>.Ok(jugador);
+            }
+            catch (Exception ex)
+            {
+                return ApiResult<Jugador>.Fail(ex.Message);
+            }
         }
 
         // DELETE: api/Jugadores/5
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteJugador(int id)
+        public async Task<ActionResult<ApiResult<Jugador>>> DeleteJugador(int id)
         {
-            var jugador = await _context.Jugador.FindAsync(id);
-            if (jugador == null)
+            try
             {
-                return NotFound();
+                var jugador = await _context.Jugador.FindAsync(id);
+                if (jugador == null)
+                {
+                    return ApiResult<Jugador>.Fail("Jugador no encontrado.");
+                }
+
+                
+                var tieneEstadisticas = await _context.Detalle
+                    .AnyAsync(d => d.JugadorId == id);
+
+                if (tieneEstadisticas)
+                {
+                    return ApiResult<Jugador>.Fail("No se puede eliminar el jugador, tiene estadísticas de partidos registradas (goles/tarjetas).");
+                }
+
+
+                _context.Jugador.Remove(jugador);
+                await _context.SaveChangesAsync();
+
+                return ApiResult<Jugador>.Ok(null);
             }
-
-            _context.Jugador.Remove(jugador);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
+            catch (Exception ex)
+            {
+                return ApiResult<Jugador>.Fail(ex.Message);
+            }
         }
 
         private bool JugadorExists(int id)

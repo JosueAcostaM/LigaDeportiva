@@ -15,12 +15,8 @@ namespace Modelos_LigaDeportiva
         public string TipoPartido { get; set; }
 
         public int TorneoId { get; set; }
-        public int EquipoLocalId { get; set; }
-        public int EquipoVisitanteId { get; set; }
 
         public Torneo? Torneo { get; set; }
-
-        public Equipo? Equipo { get; set; }
 
         public List<Detalle>? Detalles { get; set; }
 
