@@ -14,9 +14,11 @@ namespace Modelos_LigaDeportiva
 
         public int PartidoId { get; set; }
         public int JugadorId { get; set; }
+        public int ResultadoId { get; set; }
 
         public Partido? Partido { get; set; }
 
         public Jugador? Jugador { get; set; }
+        public Resultado? Resultado { get; set; }
     }
 }
