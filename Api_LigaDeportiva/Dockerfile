@@ -20,4 +20,4 @@ RUN dotnet publish "Api_LigaDeportiva.csproj" -c Release -o /app/publish /p:UseA
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
-ENTRYPOINT ["dotnet", "Api_LigaDeportiva.dll"]
+ENTRYPOINT ["dotnet", "Api_LigaDeportiva.dll"] 
