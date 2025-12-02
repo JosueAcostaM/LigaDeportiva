@@ -1,0 +1,6 @@
+@Api_LigaDeportiva_HostAddress = http://localhost:5013
+
+GET {{Api_LigaDeportiva_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
