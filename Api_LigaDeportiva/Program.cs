@@ -1,4 +1,9 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Api_LigaDeportiva.Data;
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddDbContext<Api_LigaDeportivaContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("Api_LigaDeportivaContext") ?? throw new InvalidOperationException("Connection string 'Api_LigaDeportivaContext' not found.")));
 
 // Add services to the container.
 
